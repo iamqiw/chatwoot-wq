@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>迁移验收清单</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="box">
+        <h3>Must-pass 验收清单</h3>
+        <ol class="tight">
+          <li>会话状态、优先级、分配、标签、last_seen 节流与事件广播语义一致。</li>
+          <li>消息类型/内容类型/状态枚举与首响统计口径一致。</li>
+          <li>联系人唯一性与格式校验一致（email/phone/identifier）。</li>
+          <li>Inbox 的 active_bot 判定、可分配人范围、回调 URL 规则一致。</li>
+          <li>AutomationRule 条件/动作白名单与 AND/OR 运算符校验一致。</li>
+          <li>Macro 可见性和执行权限一致（global/personal + author/admin）。</li>
+          <li>Campaign 类型推导、URL 校验、触发链路、渠道执行策略一致。</li>
+          <li>HelpCenter portal/article 状态机、语言继承、排序策略一致。</li>
+          <li>Pundit 关键策略边界一致（Conversation/Contact/Inbox/Campaign/AutomationRule）。</li>
+          <li>Sidekiq 调度、重试、死信、日志可观测能力一致。</li>
+        </ol>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>建议的执行顺序</h3>
+      <ol class="tight">
+        <li>先完成 AUTH + CONV + CRM 主链路。</li>
+        <li>再补 AUTO + INBOX + CMP + HC。</li>
+        <li>最后完成 ACL + ASYNC + EE（Captain/SLA/审计）回归。</li>
+      </ol>
+    </section>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>document.getElementById('hero').innerHTML = hero('migration-checklist.html', '迁移验收：从功能可达升级到行为等价。');</script>
+</body>
+</html>

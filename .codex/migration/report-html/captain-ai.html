@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Captain AI 深度分析</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+
+    <section class="panel">
+      <h3>分析结论</h3>
+      <div class="grid2">
+        <div class="box">
+          <ul class="tight">
+            <li>Captain 不是单一“聊天机器人”，而是 <b>配置台 + 运行时 + 异步管道 + 计费/配额</b> 的组合系统。</li>
+            <li>V1 以单助手为主；V2 引入多 Agent 编排（Assistant + Scenarios）和 Tool handoff。</li>
+            <li>业务关键不是页面，而是状态切换时机：<code>pending/open/resolved</code>、handoff、usage 扣减。</li>
+          </ul>
+        </div>
+        <div class="box">
+          <h3>专项文档</h3>
+          <p class="muted">详细代码级说明请看：</p>
+          <p><code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/15-captain-ai-deep-analysis.md</code></p>
+          <p class="muted">该页面用于快速检索功能与代码映射，并直接查看截图证据。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>细粒度功能矩阵</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>前端页面/路由</th>
+              <th>后端 API</th>
+              <th>核心服务/任务</th>
+              <th>关键约束</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Assistants</td>
+              <td><code>captain.routes.js</code><br/><code>assistants/settings/Settings.vue</code></td>
+              <td><code>captain/assistants</code><br/><code>assistants#playground</code></td>
+              <td><code>Captain::Assistant</code><br/><code>AssistantChatService</code></td>
+              <td>创建/更新/删除仅管理员；playground 允许 agent</td>
+            </tr>
+            <tr>
+              <td>FAQs</td>
+              <td><code>responses/Index.vue</code><br/><code>responses/Pending.vue</code></td>
+              <td><code>captain/assistant_responses</code><br/><code>captain/bulk_actions</code></td>
+              <td><code>Captain::AssistantResponse</code><br/><code>UpdateEmbeddingJob</code></td>
+              <td>pending/approved 审核流；向量索引检索</td>
+            </tr>
+            <tr>
+              <td>Documents</td>
+              <td><code>documents/Index.vue</code></td>
+              <td><code>captain/documents</code></td>
+              <td><code>Documents::CrawlJob</code><br/><code>Documents::ResponseBuilderJob</code></td>
+              <td>文档配额限制；URL/PDF 双路径</td>
+            </tr>
+            <tr>
+              <td>Scenarios (V2)</td>
+              <td><code>assistants/scenarios/Index.vue</code></td>
+              <td><code>captain/assistants/:id/scenarios</code></td>
+              <td><code>Captain::Scenario</code><br/><code>AgentRunnerService</code></td>
+              <td>工具引用语法 <code>tool://</code> 必须合法</td>
+            </tr>
+            <tr>
+              <td>Guardrails / Guidelines (V2)</td>
+              <td><code>assistants/guardrails/Index.vue</code><br/><code>assistants/guidelines/Index.vue</code></td>
+              <td><code>captain/assistants/:id</code>（update）</td>
+              <td><code>assistant.liquid</code><br/><code>scenario.liquid</code></td>
+              <td>以数组形式注入提示词</td>
+            </tr>
+            <tr>
+              <td>Custom Tools (V2)</td>
+              <td><code>tools/Index.vue</code></td>
+              <td><code>captain/custom_tools</code></td>
+              <td><code>Captain::Tools::HttpTool</code><br/><code>Concerns::Toolable</code></td>
+              <td>SSRF 防护：HTTPS/非私网/IP 拦截/响应体大小限制</td>
+            </tr>
+            <tr>
+              <td>Inboxes</td>
+              <td><code>assistants/inboxes/Index.vue</code></td>
+              <td><code>captain/assistants/:id/inboxes</code></td>
+              <td><code>CaptainInbox</code></td>
+              <td>同一 inbox 只能绑定一个 assistant（唯一约束）</td>
+            </tr>
+            <tr>
+              <td>Conversation Auto Reply</td>
+              <td>对话页触发（非独立页）</td>
+              <td>模板 hook 内触发</td>
+              <td><code>HookExecutionService</code><br/><code>Conversation::ResponseBuilderJob</code></td>
+              <td>pending + incoming + inbox 绑定 assistant 才触发</td>
+            </tr>
+            <tr>
+              <td>Copilot</td>
+              <td><code>components-next/copilot/*</code><br/><code>CopilotContainer.vue</code></td>
+              <td><code>captain/copilot_threads</code><br/><code>copilot_messages</code></td>
+              <td><code>Copilot::ChatService</code><br/><code>Copilot::ResponseJob</code></td>
+              <td>企业环境 + Captain 开启；同样消耗 response credits</td>
+            </tr>
+            <tr>
+              <td>Tasks（编辑器 AI）</td>
+              <td>对话输入框 AI 操作</td>
+              <td><code>captain/tasks/*</code></td>
+              <td><code>RewriteService</code>/<code>SummaryService</code>/<code>ReplySuggestionService</code>/<code>LabelSuggestionService</code>/<code>FollowUpService</code></td>
+              <td>统一走 BaseTaskService；Cloud 受配额限制</td>
+            </tr>
+            <tr>
+              <td>Captain Settings</td>
+              <td><code>settings/captain/Index.vue</code></td>
+              <td><code>captain/preferences</code></td>
+              <td><code>PreferencesController</code></td>
+              <td>按 feature 选择模型 + 启停特性</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>交互证据矩阵（点击后截图 + 接口 + 代码定位）</h3>
+      <p class="muted">表格内截图可直接预览，点击缩略图可打开原图。接口来自本地浏览器抓包：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/evidence/captain-network-tools.log</code>。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>页面</th>
+              <th>交互动作</th>
+              <th>实际请求 API</th>
+              <th>前端代码</th>
+              <th>后端代码</th>
+              <th>截图证据</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>FAQs</td>
+              <td>切换 Pending/Approved，打开创建入口</td>
+              <td><code>GET /captain/assistant_responses?status=pending|approved</code></td>
+              <td><code>app/javascript/dashboard/api/captain/response.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/assistant_responses_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/faqs-01-create-modal-open.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/faqs-01-create-modal-open.png" alt="FAQs create modal" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Documents</td>
+              <td>进入文档页并加载文档列表</td>
+              <td><code>GET /captain/documents?page=1&amp;assistant_id=1</code></td>
+              <td><code>app/javascript/dashboard/api/captain/document.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/documents_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/documents-00-index.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/documents-00-index.png" alt="Documents index" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Scenarios</td>
+              <td>点击 Add all 自动生成场景</td>
+              <td><code>POST /captain/assistants/1/scenarios</code></td>
+              <td><code>app/javascript/dashboard/api/captain/scenarios.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/scenarios_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/scenarios-01-after-add-all.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/scenarios-01-after-add-all.png" alt="Scenarios add all" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Scenarios</td>
+              <td>在 Create modal 填写名称、描述、示例问题</td>
+              <td><code>POST /captain/assistants/1/scenarios</code></td>
+              <td><code>app/javascript/dashboard/api/captain/scenarios.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/scenarios_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/scenarios-05-create-modal-filled.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/scenarios-05-create-modal-filled.png" alt="Scenarios create modal filled" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Playground</td>
+              <td>输入测试问题，触发调试链路</td>
+              <td><code>GET /captain/assistants?page=1</code>（初始化）</td>
+              <td><code>app/javascript/dashboard/api/captain/assistant.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/assistants_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/playground-01-input-filled.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/playground-01-input-filled.png" alt="Playground input" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Inboxes</td>
+              <td>进入绑定页查看可绑定渠道</td>
+              <td><code>GET /captain/assistants/1/inboxes</code></td>
+              <td><code>app/javascript/dashboard/api/captain/inboxes.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/inboxes_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/inboxes-00-index.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/inboxes-00-index.png" alt="Inboxes index" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Tools</td>
+              <td>点击 Create a new tool 打开创建弹窗</td>
+              <td><code>GET /captain/custom_tools?page=1</code></td>
+              <td><code>app/javascript/dashboard/api/captain/customTools.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/custom_tools_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/tools-02-create-modal-open.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/tools-02-create-modal-open.png" alt="Tools create modal open" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Tools</td>
+              <td>切换 Method/Auth、Add Parameter、填写创建表单（未提交）</td>
+              <td><code>GET /captain/custom_tools?page=1</code>（弹窗操作本身不新发写请求）</td>
+              <td><code>app/javascript/dashboard/api/captain/customTools.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/custom_tools_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/tools-03-create-modal-filled.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/tools-03-create-modal-filled.png" alt="Tools create modal filled" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td>Settings</td>
+              <td>进入设置页，展开配置项表单</td>
+              <td><code>GET /captain/assistants?page=1</code></td>
+              <td><code>app/javascript/dashboard/api/captain/assistant.js</code><br/><code>app/javascript/dashboard/api/captain/preferences.js</code></td>
+              <td><code>enterprise/app/controllers/api/v1/accounts/captain/assistants_controller.rb</code></td>
+              <td>
+                <a class="thumb-link" href="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/settings-01-form-visible.png" target="_blank" rel="noopener noreferrer">
+                  <img class="thumb-img" src="/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/settings-01-form-visible.png" alt="Settings form visible" />
+                  <span class="thumb-open">打开原图</span>
+                </a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>截图证据（Captain 专项）</h3>
+      <p class="muted">这是静态页面覆盖；动态交互请优先看上方“交互证据矩阵”。</p>
+      <div class="gallery">
+        <a class="shot" href="../screenshots/local/authenticated/captain-assistants.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-assistants.png" alt="captain-assistants" />
+          <div class="meta"><b>Assistants</b><span>助手列表/创建入口</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-responses.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-responses.png" alt="captain-responses" />
+          <div class="meta"><b>FAQs</b><span>知识库问答管理</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-documents.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-documents.png" alt="captain-documents" />
+          <div class="meta"><b>Documents</b><span>文档导入与解析</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-tools.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-tools.png" alt="captain-tools" />
+          <div class="meta"><b>Custom Tools</b><span>外部 API 工具</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-scenarios.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-scenarios.png" alt="captain-scenarios" />
+          <div class="meta"><b>Scenarios</b><span>场景规则与工具引用</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-guardrails.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-guardrails.png" alt="captain-guardrails" />
+          <div class="meta"><b>Guardrails</b><span>回答边界约束</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-guidelines.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-guidelines.png" alt="captain-guidelines" />
+          <div class="meta"><b>Guidelines</b><span>回答风格控制</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-inboxes.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-inboxes.png" alt="captain-inboxes" />
+          <div class="meta"><b>Inboxes</b><span>部署到收件箱</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-playground.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-playground.png" alt="captain-playground" />
+          <div class="meta"><b>Playground</b><span>调试助手输出</span></div>
+        </a>
+        <a class="shot" href="../screenshots/local/authenticated/captain-settings.png" target="_blank" rel="noopener noreferrer">
+          <img src="../screenshots/local/authenticated/captain-settings.png" alt="captain-settings" />
+          <div class="meta"><b>Settings</b><span>基础设置/控制项</span></div>
+        </a>
+      </div>
+    </section>
+
+    <section class="panel warn">
+      <h3>暂未完全截图覆盖</h3>
+      <ul class="tight">
+        <li>Firecrawl 外部回调全链路（依赖真实第三方回调触发）。</li>
+        <li>Copilot 工具分支的全部结果页（如 Linear 搜索结果）。</li>
+        <li>大文档分页 FAQ 生成（PaginatedFaqGeneratorService）过程态页面。</li>
+      </ul>
+    </section>
+
+    <p class="footer">页面：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/report-html/captain-ai.html</code></p>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('captain-ai.html', 'Captain AI 专项：功能、代码、异步任务与迁移关键点。');
+  </script>
+</body>
+</html>

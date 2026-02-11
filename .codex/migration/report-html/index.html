@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>功能分析总览</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="grid2">
+        <div class="box">
+          <h3>报告目标</h3>
+          <ul class="tight">
+            <li>将“页面截图证明”升级为“行为规则证明”。</li>
+            <li>为 Java + React 重构提供可执行验收标准。</li>
+            <li>保证迁移后权限、状态机、异步任务与统计口径一致。</li>
+          </ul>
+          <div class="chips">
+            <span class="chip">功能矩阵可搜索</span>
+            <span class="chip">截图可筛选+灯箱</span>
+            <span class="chip">验收清单可直接执行</span>
+          </div>
+        </div>
+        <div class="box">
+          <h3>文档入口（原始资料）</h3>
+          <ul class="tight">
+            <li><code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/02-granular-feature-catalog.md</code></li>
+            <li><code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/03-architecture-deep-dive.md</code></li>
+            <li><code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/06-acceptance-matrix.md</code></li>
+            <li><code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/07-screenshot-index.md</code></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>推荐使用顺序</h3>
+      <ol class="tight">
+        <li>先看“Captain AI”，确认 AI 功能边界、任务链路与代码映射。</li>
+        <li>再看“功能矩阵”，确认每个域的关键行为规则。</li>
+        <li>再看“截图中心”，验证页面可达与交互证据。</li>
+        <li>最后按“迁移验收”逐项做接口与行为回归。</li>
+      </ol>
+    </section>
+    <p class="footer">文件位置：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/report-html/index.html</code></p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>document.getElementById('hero').innerHTML = hero('index.html', '将信息拆分为多页面，便于阅读与验收。');</script>
+</body>
+</html>

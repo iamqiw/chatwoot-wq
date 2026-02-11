@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>功能矩阵</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索功能/ID/路由/规则/代码锚点..." />
+        <select id="domain">
+          <option value="all">全部域</option>
+          <option>AUTH</option><option>CONV</option><option>CRM</option><option>INBOX</option>
+          <option>AUTO</option><option>CMP</option><option>HC</option><option>ACL</option><option>ASYNC</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>域</th><th>ID</th><th>功能点</th><th>关键规则</th><th>页面/接口</th><th>前端锚点</th><th>后端锚点</th>
+            </tr>
+          </thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </section>
+    <p class="footer">提示：此页用于“行为等价”验收，不仅是页面可达验收。</p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('feature-matrix.html', '功能矩阵：可搜索、可按域过滤。');
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const tb = document.getElementById('tb');
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const rows = FEATURE_DATA
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+      tb.innerHTML = rows.map(x => `<tr>
+        <td>${x.d}</td><td>${x.id}</td><td>${x.f}</td><td>${x.rule}</td>
+        <td><code>${x.r}</code></td><td><code>${x.fe}</code></td><td><code>${x.be}</code></td>
+      </tr>`).join('');
+    }
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

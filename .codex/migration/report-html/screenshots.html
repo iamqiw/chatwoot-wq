@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>截图中心</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索截图名/路径..." />
+        <select id="scope">
+          <option value="all">全部范围</option>
+          <option value="authenticated">authenticated</option>
+          <option value="super-admin">super-admin</option>
+          <option value="unauthenticated">unauthenticated</option>
+        </select>
+        <select id="group">
+          <option value="all">全部分组</option>
+          <option value="local">local</option>
+          <option value="extended">extended</option>
+          <option value="link-sweep">link-sweep</option>
+          <option value="interactive">interactive</option>
+          <option value="web">web</option>
+        </select>
+      </div>
+      <div id="count" class="muted"></div>
+      <div id="gallery" class="gallery"></div>
+    </section>
+    <p class="footer">点击图片可灯箱查看，右上角可直接打开原图。</p>
+  </div>
+
+  <div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+      <button class="lb-btn lb-prev" id="lbPrev">‹</button>
+      <img id="lbImg" src="" alt="preview" />
+      <button class="lb-btn lb-next" id="lbNext">›</button>
+      <div class="lightbox-bar">
+        <span id="lbTitle"></span>
+        <span><a id="lbOpen" class="open-link" href="#" target="_blank">打开原图</a> · <a id="lbClose" class="open-link" href="#">关闭</a></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('screenshots.html', '截图中心：支持筛选、搜索、放大与原图打开。');
+    setupLightbox();
+
+    const q = document.getElementById('q');
+    const scope = document.getElementById('scope');
+    const group = document.getElementById('group');
+    const gallery = document.getElementById('gallery');
+    const count = document.getElementById('count');
+
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const sc = scope.value;
+      const gp = group.value;
+      const rows = SCREENSHOT_DATA
+        .filter(x => sc === 'all' || x.scope === sc)
+        .filter(x => gp === 'all' || x.group === gp)
+        .filter(x => x.title.toLowerCase().includes(s) || x.path.toLowerCase().includes(s));
+
+      count.textContent = `当前结果：${rows.length} / ${SCREENSHOT_DATA.length}`;
+      gallery.innerHTML = rows.map((x, i) => `<article class="shot" data-idx="${i}">
+        <img src="${x.path}" alt="${x.title}" loading="lazy" />
+        <div class="meta"><b title="${x.title}">${x.title}</b><span>${x.scope} · ${x.group}</span></div>
+      </article>`).join('');
+      window.lightboxBind(rows);
+    }
+
+    q.addEventListener('input', render);
+    scope.addEventListener('change', render);
+    group.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

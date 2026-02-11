@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chatwoot 功能分析总报告（交互版）</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --panel: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --brand: #0f766e;
+      --line: #e2e8f0;
+      --chip: #ecfeff;
+      --warn: #fff7ed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top right, #e0f2fe 0, #f4f6fb 40%), var(--bg);
+    }
+    .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+    .hero {
+      background: linear-gradient(135deg, #0f766e 0%, #0369a1 100%);
+      color: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 30px rgba(2, 132, 199, 0.2);
+    }
+    .hero h1 { margin: 0 0 8px; font-size: 28px; }
+    .hero p { margin: 0; opacity: 0.92; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+    .stat {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat b { display: block; font-size: 22px; margin-bottom: 4px; }
+    .tabs { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .panel {
+      margin-top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      display: none;
+    }
+    .panel.active { display: block; }
+    .grid2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+    .box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; }
+    h2, h3 { margin: 8px 0 10px; }
+    .muted { color: var(--muted); }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { background: var(--chip); border: 1px solid #bae6fd; color: #075985; border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid var(--line); padding: 8px; vertical-align: top; text-align: left; }
+    th { background: #f8fafc; position: sticky; top: 0; z-index: 1; }
+    .table-wrap { max-height: 65vh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    input, select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 13px;
+      background: white;
+    }
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+    .shot {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+      cursor: pointer;
+    }
+    .shot img { width: 100%; height: 150px; object-fit: cover; display: block; background: #e2e8f0; }
+    .shot .meta { padding: 8px; font-size: 12px; }
+    .shot .meta b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shot .meta span { color: var(--muted); }
+    .checklist li { margin-bottom: 8px; }
+    .warn { background: var(--warn); border: 1px solid #fed7aa; border-radius: 12px; padding: 10px; }
+
+    .lightbox {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.82);
+      display: none; align-items: center; justify-content: center; z-index: 999;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox-content { max-width: 95vw; max-height: 95vh; position: relative; }
+    .lightbox-content img { max-width: 95vw; max-height: 88vh; display: block; border-radius: 8px; }
+    .lightbox-bar {
+      color: #e2e8f0; margin-top: 8px; display: flex; justify-content: space-between; gap: 8px; font-size: 12px;
+    }
+    .lb-btn {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      border: 0; background: rgba(255,255,255,0.22); color: white; font-size: 22px;
+      width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+    }
+    .lb-prev { left: -52px; }
+    .lb-next { right: -52px; }
+    .open-link { color: #38bdf8; text-decoration: underline; }
+
+    @media (max-width: 980px) {
+      .grid2 { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .lb-prev { left: 8px; }
+      .lb-next { right: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <h1>Chatwoot 功能分析总报告（HTML 交互版）</h1>
+      <p>面向 Java + React 重构的行为级基线：功能矩阵、代码锚点、截图证据、迁移验收清单。</p>
+      <div class="stats">
+        <div class="stat"><b>177</b><span>截图资产</span></div>
+        <div class="stat"><b>702</b><span>后端路由信号</span></div>
+        <div class="stat"><b>483</b><span>前端路由信号</span></div>
+        <div class="stat"><b>13</b><span>核心交付文档</span></div>
+      </div>
+    </section>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="overview">总览</button>
+      <button class="tab" data-tab="matrix">功能矩阵</button>
+      <button class="tab" data-tab="screens">截图浏览器</button>
+      <button class="tab" data-tab="checklist">迁移验收</button>
+      <button class="tab" data-tab="limits">做不到项</button>
+    </nav>
+
+    <section id="overview" class="panel active">
+      <div class="grid2">
+        <div class="box">
+          <h3>架构拆分视角（迁移建议）</h3>
+          <ul>
+            <li>业务主域：认证、会话、消息、联系人、收件箱</li>
+            <li>运营域：自动化规则、宏、报表、Campaign、HelpCenter</li>
+            <li>管理域：设置中心、权限体系、Super Admin、Sidekiq 运维</li>
+            <li>企业扩展域：Captain、SLA、自定义角色、审计日志</li>
+          </ul>
+          <div class="chips">
+            <span class="chip">行为等价优先</span>
+            <span class="chip">接口契约不破</span>
+            <span class="chip">权限边界不放松</span>
+            <span class="chip">异步语义可观测</span>
+          </div>
+        </div>
+        <div class="box">
+          <h3>报告入口</h3>
+          <p class="muted">你可以把这个文件当作验收首页，用于替代单纯 Markdown。</p>
+          <ul>
+            <li>功能基线：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/02-granular-feature-catalog.md</code></li>
+            <li>架构深潜：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/03-architecture-deep-dive.md</code></li>
+            <li>验收矩阵：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/06-acceptance-matrix.md</code></li>
+            <li>截图索引：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/07-screenshot-index.md</code></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="matrix" class="panel">
+      <div class="controls">
+        <input id="featureSearch" placeholder="搜索功能/ID/路由/文件..." />
+        <select id="domainFilter">
+          <option value="all">全部域</option>
+          <option value="AUTH">AUTH</option>
+          <option value="CONV">CONV</option>
+          <option value="CRM">CRM</option>
+          <option value="INBOX">INBOX</option>
+          <option value="AUTO">AUTO</option>
+          <option value="CMP">CMP</option>
+          <option value="HC">HC</option>
+          <option value="ACL">ACL</option>
+          <option value="ASYNC">ASYNC</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table id="featureTable">
+          <thead>
+            <tr>
+              <th>域</th>
+              <th>ID</th>
+              <th>功能点</th>
+              <th>关键规则</th>
+              <th>页面/接口</th>
+              <th>前端锚点</th>
+              <th>后端锚点</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screens" class="panel">
+      <div class="controls">
+        <input id="shotSearch" placeholder="搜索截图名..." />
+        <select id="scopeFilter">
+          <option value="all">全部范围</option>
+          <option value="authenticated">authenticated</option>
+          <option value="super-admin">super-admin</option>
+          <option value="unauthenticated">unauthenticated</option>
+        </select>
+        <select id="groupFilter">
+          <option value="all">全部分组</option>
+          <option value="local">local</option>
+          <option value="extended">extended</option>
+          <option value="link-sweep">link-sweep</option>
+          <option value="web">web</option>
+        </select>
+      </div>
+      <div class="muted" id="shotCount"></div>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <section id="checklist" class="panel">
+      <div class="box">
+        <h3>迁移验收 Checklist（必须逐项打勾）</h3>
+        <ol class="checklist">
+          <li>会话状态、优先级、分配、标签、last_seen 节流与事件广播语义一致。</li>
+          <li>消息类型/内容类型/状态枚举与首响统计口径一致。</li>
+          <li>联系人唯一性与格式校验一致（email/phone/identifier）。</li>
+          <li>Inbox 的 active_bot 判定、可分配人范围、渠道回调 URL 规则一致。</li>
+          <li>AutomationRule 条件/动作白名单与 AND/OR 运算符校验一致。</li>
+          <li>Macro 可见性和执行权限一致（global/personal + author/admin）。</li>
+          <li>Campaign 类型推导、URL 校验、触发链路、渠道执行策略一致。</li>
+          <li>HelpCenter 的 portal config、article 状态机、语言继承、排序策略一致。</li>
+          <li>Pundit 策略边界一致（Conversation/Contact/Inbox/Campaign/AutomationRule）。</li>
+          <li>Sidekiq 调度、重试、死信、日志可观测能力一致。</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="limits" class="panel">
+      <div class="warn">
+        <h3>当前环境限制（单独说明）</h3>
+        <ol>
+          <li>第三方渠道真实联调（WhatsApp/Facebook/Instagram/Line/Twitter）受凭据和公网回调限制。</li>
+          <li>部分 EE 页面受套餐/数据条件限制，会回退 Dashboard 或仅显示空态。</li>
+          <li>API-only 控制器天然无独立可视页面，需用契约测试替代截图。</li>
+          <li>Sidekiq `cron` 页面在当前镜像中返回 404，其余队列页可访问。</li>
+        </ol>
+      </div>
+    </section>
+  </div>
+
+  <div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+      <button class="lb-btn lb-prev" id="lbPrev">‹</button>
+      <img id="lbImg" src="" alt="preview" />
+      <button class="lb-btn lb-next" id="lbNext">›</button>
+      <div class="lightbox-bar">
+        <span id="lbTitle"></span>
+        <span><a id="lbOpen" class="open-link" href="#" target="_blank">打开原图</a> · <a id="lbClose" class="open-link" href="#">关闭</a></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FEATURE_DATA = [
+      { d:'AUTH', id:'AUTH-01', f:'登录/登出/注册/重置', r:'/app/login + auth API', rule:'认证流程与多租户上下文切换', fe:'/app/javascript/v3/views/routes.js', be:'/config/routes.rb' },
+      { d:'CONV', id:'CONV-D01', f:'会话状态与优先级枚举', r:'/api/v1/accounts/:id/conversations', rule:'status=open/resolved/pending/snoozed; priority=low/medium/high/urgent', fe:'/app/javascript/dashboard/routes/dashboard/conversation/conversation.routes.js', be:'/app/models/conversation.rb:75' },
+      { d:'CONV', id:'CONV-D02', f:'新会话默认状态判定', r:'conversation create', rule:'blocked->resolved; active_bot->pending; campaign+bot->pending', fe:'/app/javascript/dashboard/routes/dashboard/conversation', be:'/app/models/conversation.rb:254' },
+      { d:'CONV', id:'CONV-D03', f:'toggle_status 语义', r:'POST toggle_status', rule:'open<->resolved, pending/snoozed->open', fe:'/app/javascript/dashboard/store/modules/conversations', be:'/app/models/conversation.rb:149' },
+      { d:'CONV', id:'CONV-D04', f:'last_seen 节流', r:'POST update_last_seen', rule:'无未读时按小时节流写入', fe:'/app/javascript/dashboard', be:'/app/controllers/api/v1/accounts/conversations_controller.rb:114' },
+      { d:'CRM', id:'CRM-D01', f:'联系人类型与唯一性', r:'/api/v1/accounts/:id/contacts', rule:'visitor/lead/customer; email/phone/identifier 约束', fe:'/app/javascript/dashboard/routes/dashboard/contacts/routes.js', be:'/app/models/contact.rb:50' },
+      { d:'CRM', id:'CRM-D02', f:'联系人事件派发', r:'contact lifecycle events', rule:'create/update/delete 均派发 dispatcher', fe:'/app/javascript/dashboard', be:'/app/models/contact.rb:235' },
+      { d:'INBOX', id:'INBOX-D01', f:'渠道识别与行为', r:'/api/v1/accounts/:id/inboxes', rule:'web/api/email/sms/whatsapp/social 分型', fe:'/app/javascript/dashboard/routes/dashboard/settings/inbox/inbox.routes.js', be:'/app/models/inbox.rb:113' },
+      { d:'INBOX', id:'INBOX-D02', f:'active_bot 判定', r:'conversation bootstrap', rule:'agent_bot_active 或 dialogflow hook enabled', fe:'/app/javascript/dashboard', be:'/app/models/inbox.rb:169' },
+      { d:'INBOX', id:'INBOX-D03', f:'可分配坐席集合', r:'assignable agents', rule:'inbox members + account admins', fe:'/app/javascript/dashboard/components', be:'/app/models/inbox.rb:165' },
+      { d:'AUTO', id:'AUTO-D01', f:'自动化条件白名单', r:'/api/v1/accounts/:id/automation_rules', rule:'conditions_attributes + 自定义属性', fe:'/app/javascript/dashboard/routes/dashboard/settings/automation', be:'/app/models/automation_rule.rb:37' },
+      { d:'AUTO', id:'AUTO-D02', f:'自动化动作白名单', r:'automation actions', rule:'仅允许定义动作集合', fe:'/app/javascript/dashboard', be:'/app/models/automation_rule.rb:42' },
+      { d:'AUTO', id:'AUTO-D03', f:'逻辑运算符校验', r:'automation conditions', rule:'query_operator 仅 AND/OR', fe:'/app/javascript/dashboard', be:'/app/models/automation_rule.rb:91' },
+      { d:'AUTO', id:'AUTO-D04', f:'Macro 可见性与执行权限', r:'/api/v1/accounts/:id/macros', rule:'personal/global + author/admin 策略', fe:'/app/javascript/dashboard/routes/dashboard/settings/macros', be:'/app/models/macro.rb:29 + /app/policies/macro_policy.rb:10' },
+      { d:'CMP', id:'CMP-D01', f:'Campaign 类型约束', r:'/api/v1/accounts/:id/campaigns', rule:'仅 Website/Twilio SMS/Sms/Whatsapp', fe:'/app/javascript/dashboard/routes/dashboard/campaigns/campaigns.routes.js', be:'/app/models/campaign.rb:81' },
+      { d:'CMP', id:'CMP-D02', f:'ongoing/one_off 推导', r:'campaign create/update', rule:'Website=ongoing; SMS/Twilio/Whatsapp=one_off', fe:'/app/javascript/dashboard/components-next/Campaigns', be:'/app/models/campaign.rb:88' },
+      { d:'CMP', id:'CMP-D03', f:'URL 校验规则', r:'live chat campaign', rule:'Website campaign URL 必须 http/https', fe:'/app/javascript/dashboard/components-next/Campaigns', be:'/app/models/campaign.rb:100' },
+      { d:'CMP', id:'CMP-D04', f:'Widget 触发链路', r:'/api/v1/widget/campaigns + /events', rule:'曝光匹配后发 campaign.triggered 建会话', fe:'/app/javascript/widget/api/endPoints.js:79', be:'/app/listeners/campaign_listener.rb:2' },
+      { d:'HC', id:'HC-D01', f:'Portal 基础约束', r:'/api/v1/accounts/:id/portals', rule:'name/slug/account 必填；slug/custom_domain 唯一', fe:'/app/javascript/dashboard/routes/dashboard/helpcenter/helpcenter.routes.js', be:'/app/models/portal.rb:39' },
+      { d:'HC', id:'HC-D02', f:'Article 状态机与语言继承', r:'/api/v1/accounts/:id/articles', rule:'draft/published/archived + locale 继承', fe:'/app/javascript/dashboard/routes/dashboard/helpcenter', be:'/app/models/article.rb:67' },
+      { d:'ACL', id:'ACL-D01', f:'默认拒绝策略', r:'all policies', rule:'ApplicationPolicy 默认 create/update/destroy=false', fe:'N/A', be:'/app/policies/application_policy.rb:12' },
+      { d:'ACL', id:'ACL-D02', f:'会话可见范围', r:'conversation show/index', rule:'admin 全量；agent 需 inbox/team 访问', fe:'/app/javascript/dashboard', be:'/app/policies/conversation_policy.rb:10' },
+      { d:'ACL', id:'ACL-D03', f:'联系人高危操作限权', r:'contact import/export/destroy', rule:'管理员专属', fe:'/app/javascript/dashboard/routes/dashboard/contacts', be:'/app/policies/contact_policy.rb:10' },
+      { d:'ASYNC', id:'ASYNC-D01', f:'定时触发计划项', r:'trigger_scheduled_items_job', rule:'每 5 分钟执行', fe:'N/A', be:'/config/schedule.yml:11' },
+      { d:'ASYNC', id:'ASYNC-D02', f:'IMAP 拉取任务', r:'trigger_imap_email_inboxes_job', rule:'每 1 分钟执行', fe:'N/A', be:'/config/schedule.yml:17' },
+      { d:'ASYNC', id:'ASYNC-D03', f:'自动分配任务', r:'bulk_auto_assignment + periodic_assignment', rule:'每 15/30 分钟执行', fe:'N/A', be:'/config/schedule.yml:51' },
+      { d:'ASYNC', id:'ASYNC-D04', f:'清理任务', r:'notification/orphan/stale cleanup', rule:'按 cron 执行运维清理', fe:'N/A', be:'/config/schedule.yml:24' }
+    ];
+
+const SCREENSHOT_DATA = [
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/campaigns.png", title: "campaigns", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-assistants.png", title: "captain assistants", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-documents.png", title: "captain documents", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-guardrails.png", title: "captain guardrails", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-guidelines.png", title: "captain guidelines", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-inboxes.png", title: "captain inboxes", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-playground.png", title: "captain playground", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-responses.png", title: "captain responses", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-scenarios.png", title: "captain scenarios", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-settings.png", title: "captain settings", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/captain-tools.png", title: "captain tools", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/contacts.png", title: "contacts", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/conversation-folder-filter.png", title: "conversation folder filter", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/conversation-inbox-filter.png", title: "conversation inbox filter", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/conversation-label-filter.png", title: "conversation label filter", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/conversation-participating.png", title: "conversation participating", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/conversation-team-filter.png", title: "conversation team filter", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/dashboard.png", title: "dashboard", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaign-livechat-01-list.png", title: "campaign livechat 01 list", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaign-livechat-02-created-list.png", title: "campaign livechat 02 created list", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaign-livechat-03-form-fields.png", title: "campaign livechat 03 form fields", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaign-livechat-list-before-create.png", title: "campaign livechat list before create", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaigns-ongoing.png", title: "campaigns ongoing", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaigns-sms.png", title: "campaigns sms", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/campaigns-whatsapp.png", title: "campaigns whatsapp", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/companies.png", title: "companies", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/helpcenter-aaa-articles.png", title: "helpcenter aaa articles", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/helpcenter-aaa-categories.png", title: "helpcenter aaa categories", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/helpcenter-aaa-locales.png", title: "helpcenter aaa locales", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/helpcenter-aaa-public-home.png", title: "helpcenter aaa public home", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/helpcenter-aaa-settings.png", title: "helpcenter aaa settings", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/reports-bot.png", title: "reports bot", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/reports-overview.png", title: "reports overview", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-canned-new.png", title: "settings canned new", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-captain.png", title: "settings captain", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-conversation-workflow.png", title: "settings conversation workflow", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-inbox-show.png", title: "settings inbox show", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-dashboard-apps.png", title: "settings integrations dashboard apps", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-linear.png", title: "settings integrations linear", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-notion.png", title: "settings integrations notion", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-shopify.png", title: "settings integrations shopify", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-slack.png", title: "settings integrations slack", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-integrations-webhook.png", title: "settings integrations webhook", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-macros-new.png", title: "settings macros new", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-profile-mfa.png", title: "settings profile mfa", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-sla.png", title: "settings sla", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/extended/settings-teams-new.png", title: "settings teams new", scope: "authenticated", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/help-center.png", title: "help center", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/inbox-view.png", title: "inbox view", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/campaigns-livechat.png", title: "campaigns livechat", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/campaigns-ongoing.png", title: "campaigns ongoing", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/campaigns-sms.png", title: "campaigns sms", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/campaigns-whatsapp.png", title: "campaigns whatsapp", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/click-campaign-tab-livechat.png", title: "click campaign tab livechat", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/click-campaign-tab-sms.png", title: "click campaign tab sms", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/click-campaign-tab-whatsapp-failed.png", title: "click campaign tab whatsapp failed", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/click-new-campaign-button-failed.png", title: "click new campaign button failed", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/click-sidebar-campaigns.png", title: "click sidebar campaigns", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/contacts.png", title: "contacts", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/dashboard.png", title: "dashboard", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/helpcenter-aaa-articles.png", title: "helpcenter aaa articles", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/helpcenter-aaa-categories.png", title: "helpcenter aaa categories", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/helpcenter-aaa-locales.png", title: "helpcenter aaa locales", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/helpcenter-aaa-settings.png", title: "helpcenter aaa settings", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/helpcenter-portals.png", title: "helpcenter portals", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/mentions.png", title: "mentions", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-agent.png", title: "reports agent", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-conversation.png", title: "reports conversation", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-csat.png", title: "reports csat", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-inboxes.png", title: "reports inboxes", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-label.png", title: "reports label", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-overview.png", title: "reports overview", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/reports-teams.png", title: "reports teams", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/search.png", title: "search", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-account.png", title: "settings account", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-agents-list.png", title: "settings agents list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-auditlogs-list.png", title: "settings auditlogs list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-automation-list.png", title: "settings automation list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-canned-list.png", title: "settings canned list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-captain.png", title: "settings captain", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-custom-attributes.png", title: "settings custom attributes", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-custom-roles-list.png", title: "settings custom roles list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-inboxes-list.png", title: "settings inboxes list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-dashboard-apps.png", title: "settings integrations dashboard apps", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-linear.png", title: "settings integrations linear", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-notion.png", title: "settings integrations notion", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-shopify.png", title: "settings integrations shopify", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-slack.png", title: "settings integrations slack", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-integrations-webhook.png", title: "settings integrations webhook", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-labels-list.png", title: "settings labels list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-macros-list.png", title: "settings macros list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-profile.png", title: "settings profile", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-security.png", title: "settings security", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-sla-list.png", title: "settings sla list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-teams-list.png", title: "settings teams list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/settings-working-hours-list.png", title: "settings working hours list", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-busy.png", title: "sidekiq busy", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-cron.png", title: "sidekiq cron", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-dead.png", title: "sidekiq dead", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-home.png", title: "sidekiq home", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-queues.png", title: "sidekiq queues", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-retries.png", title: "sidekiq retries", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/sidekiq-scheduled.png", title: "sidekiq scheduled", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/link-sweep/unattended.png", title: "unattended", scope: "authenticated", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/mentions.png", title: "mentions", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/notifications.png", title: "notifications", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-agent.png", title: "reports agent", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-conversation.png", title: "reports conversation", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-csat.png", title: "reports csat", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-inbox.png", title: "reports inbox", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-label.png", title: "reports label", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-sla.png", title: "reports sla", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports-team.png", title: "reports team", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/reports.png", title: "reports", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/search.png", title: "search", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-account.png", title: "settings account", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-agent-bots.png", title: "settings agent bots", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-agents.png", title: "settings agents", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-assignment-policy.png", title: "settings assignment policy", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-attributes.png", title: "settings attributes", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-audit-logs.png", title: "settings audit logs", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-automation.png", title: "settings automation", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-billing.png", title: "settings billing", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-canned.png", title: "settings canned", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-custom-roles.png", title: "settings custom roles", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-inboxes-new.png", title: "settings inboxes new", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-inboxes.png", title: "settings inboxes", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-integrations.png", title: "settings integrations", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-labels.png", title: "settings labels", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-macros.png", title: "settings macros", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-profile.png", title: "settings profile", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-security.png", title: "settings security", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/settings-teams.png", title: "settings teams", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/authenticated/unattended.png", title: "unattended", scope: "authenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/local-register-onboarding.png", title: "local register onboarding", scope: "unauthenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/login.png", title: "login", scope: "unauthenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/register-onboarding.png", title: "register onboarding", scope: "unauthenticated", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/accounts.png", title: "accounts", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/agent-bots.png", title: "agent bots", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/dashboard.png", title: "dashboard", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-busy.png", title: "sidekiq busy", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-cron.png", title: "sidekiq cron", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-dead.png", title: "sidekiq dead", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-home.png", title: "sidekiq home", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-queues.png", title: "sidekiq queues", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-retries.png", title: "sidekiq retries", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/sidekiq-scheduled.png", title: "sidekiq scheduled", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-access-tokens.png", title: "super admin access tokens", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-account-users-new.png", title: "super admin account users new", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-app-configs-edit-1.png", title: "super admin app configs edit 1", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-app-configs-new.png", title: "super admin app configs new", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-app-configs.png", title: "super admin app configs", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-logout.png", title: "super admin logout", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-response-documents.png", title: "super admin response documents", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-responses.png", title: "super admin responses", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/extended/super-admin-root.png", title: "super admin root", scope: "super-admin", group: "extended" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/installation-configs.png", title: "installation configs", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/instance-status.png", title: "instance status", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-access-tokens.png", title: "super admin access tokens", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-account-users-new.png", title: "super admin account users new", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-accounts.png", title: "super admin accounts", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-agent-bots.png", title: "super admin agent bots", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-app-configs.png", title: "super admin app configs", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-dashboard.png", title: "super admin dashboard", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-home.png", title: "super admin home", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-installation-configs.png", title: "super admin installation configs", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-instance-status.png", title: "super admin instance status", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-platform-apps.png", title: "super admin platform apps", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-response-documents.png", title: "super admin response documents", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-responses.png", title: "super admin responses", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-root.png", title: "super admin root", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-settings.png", title: "super admin settings", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/link-sweep/super-admin-users.png", title: "super admin users", scope: "super-admin", group: "link-sweep" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/platform-apps.png", title: "platform apps", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/settings.png", title: "settings", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/sidekiq.png", title: "sidekiq", scope: "super-admin", group: "local" },
+  { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/local/super-admin/users.png", title: "users", scope: "super-admin", group: "local" },
+];
+
+
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+
+    function initTabs() {
+      $$('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          $$('.tab').forEach(x => x.classList.remove('active'));
+          $$('.panel').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          $('#' + btn.dataset.tab).classList.add('active');
+        });
+      });
+    }
+
+    function renderFeatureTable() {
+      const q = $('#featureSearch').value.trim().toLowerCase();
+      const d = $('#domainFilter').value;
+      const rows = FEATURE_DATA.filter(x => (d === 'all' || x.d === d))
+        .filter(x => JSON.stringify(x).toLowerCase().includes(q));
+      const tbody = $('#featureTable tbody');
+      tbody.innerHTML = rows.map(x => `
+        <tr>
+          <td>${x.d}</td>
+          <td>${x.id}</td>
+          <td>${x.f}</td>
+          <td>${x.rule}</td>
+          <td><code>${x.r}</code></td>
+          <td><code>${x.fe}</code></td>
+          <td><code>${x.be}</code></td>
+        </tr>
+      `).join('');
+    }
+
+    let visibleShots = [];
+    let currentShotIndex = -1;
+
+    function renderGallery() {
+      const q = $('#shotSearch').value.trim().toLowerCase();
+      const s = $('#scopeFilter').value;
+      const g = $('#groupFilter').value;
+      visibleShots = SCREENSHOT_DATA
+        .filter(x => (s === 'all' || x.scope === s))
+        .filter(x => (g === 'all' || x.group === g))
+        .filter(x => (x.title.toLowerCase().includes(q) || x.path.toLowerCase().includes(q)));
+
+      $('#shotCount').textContent = `当前结果：${visibleShots.length} / ${SCREENSHOT_DATA.length}`;
+      const el = $('#gallery');
+      el.innerHTML = visibleShots.map((x, idx) => `
+        <article class="shot" data-idx="${idx}">
+          <img src="${x.path}" alt="${x.title}" loading="lazy" />
+          <div class="meta">
+            <b title="${x.title}">${x.title}</b>
+            <span>${x.scope} · ${x.group}</span>
+          </div>
+        </article>
+      `).join('');
+
+      $$('.shot').forEach(card => {
+        card.addEventListener('click', () => openLightbox(Number(card.dataset.idx)));
+      });
+    }
+
+    function openLightbox(idx) {
+      currentShotIndex = idx;
+      const item = visibleShots[idx];
+      if (!item) return;
+      $('#lbImg').src = item.path;
+      $('#lbTitle').textContent = `${item.title} (${item.scope}/${item.group})`;
+      $('#lbOpen').href = item.path;
+      $('#lightbox').classList.add('active');
+    }
+
+    function moveLightbox(delta) {
+      if (!visibleShots.length) return;
+      currentShotIndex = (currentShotIndex + delta + visibleShots.length) % visibleShots.length;
+      openLightbox(currentShotIndex);
+    }
+
+    function initLightbox() {
+      $('#lbPrev').addEventListener('click', () => moveLightbox(-1));
+      $('#lbNext').addEventListener('click', () => moveLightbox(1));
+      $('#lbClose').addEventListener('click', e => {
+        e.preventDefault();
+        $('#lightbox').classList.remove('active');
+      });
+      $('#lightbox').addEventListener('click', e => {
+        if (e.target.id === 'lightbox') $('#lightbox').classList.remove('active');
+      });
+      document.addEventListener('keydown', e => {
+        if (!$('#lightbox').classList.contains('active')) return;
+        if (e.key === 'Escape') $('#lightbox').classList.remove('active');
+        if (e.key === 'ArrowLeft') moveLightbox(-1);
+        if (e.key === 'ArrowRight') moveLightbox(1);
+      });
+    }
+
+    initTabs();
+    initLightbox();
+    renderFeatureTable();
+    renderGallery();
+
+    $('#featureSearch').addEventListener('input', renderFeatureTable);
+    $('#domainFilter').addEventListener('change', renderFeatureTable);
+    $('#shotSearch').addEventListener('input', renderGallery);
+    $('#scopeFilter').addEventListener('change', renderGallery);
+    $('#groupFilter').addEventListener('change', renderGallery);
+  </script>
+</body>
+</html>

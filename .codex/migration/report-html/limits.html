@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>限制说明</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="warn">
+        <h3>当前环境仍受限项</h3>
+        <ol class="tight">
+          <li>第三方渠道真实联调（WhatsApp/Facebook/Instagram/Line/Twitter）受凭据和公网回调限制，无法完整闭环截图。</li>
+          <li>部分 Enterprise 页面依赖套餐开通和业务数据，在本地可能回退到 dashboard 或显示空态。</li>
+          <li>API-only 控制器（回调/授权/平台接口）天然无独立 Dashboard 页面，需要契约测试替代页面截图。</li>
+          <li>Sidekiq <code>/monitoring/sidekiq/cron</code> 在当前镜像返回 404，其余队列页可访问。</li>
+        </ol>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>风险控制建议</h3>
+      <ul class="tight">
+        <li>所有受限能力必须有“替代验证证据”：路由、控制器、策略、服务、任务、日志。</li>
+        <li>迁移到 Java 后优先补集成沙箱（第三方回调模拟器 + 契约回放）。</li>
+        <li>针对 EE 功能引入 feature toggle 与数据种子，避免环境导致误判。</li>
+      </ul>
+    </section>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>document.getElementById('hero').innerHTML = hero('limits.html', '限制说明：明确做不到项及替代验证策略。');</script>
+</body>
+</html>
