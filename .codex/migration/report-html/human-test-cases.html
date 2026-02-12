@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>人类测试用例库</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索用例标题/步骤/API/数据断言..." />
+        <select id="domain">
+          <option value="all">全部业务域</option>
+          <option value="CONV">CONV</option>
+          <option value="INBOX">INBOX</option>
+          <option value="CRM">CRM</option>
+          <option value="AUTO">AUTO</option>
+          <option value="CMP">CMP</option>
+          <option value="HC">HC</option>
+          <option value="CAPTAIN">CAPTAIN</option>
+          <option value="ACL">ACL</option>
+          <option value="ASYNC">ASYNC</option>
+          <option value="AUTH">AUTH</option>
+        </select>
+        <select id="type">
+          <option value="all">全部类型</option>
+          <option value="happy">happy</option>
+          <option value="boundary">boundary</option>
+          <option value="permission">permission</option>
+          <option value="failure">failure</option>
+        </select>
+        <select id="priority">
+          <option value="all">全部优先级</option>
+          <option value="P0">P0</option>
+          <option value="P1">P1</option>
+          <option value="P2">P2</option>
+        </select>
+      </div>
+      <div id="stats" class="muted"></div>
+      <div id="cases" class="case-grid"></div>
+    </section>
+    <p class="footer">每条用例都可直接用于迁移验收脚本编写（接口断言 + 数据断言 + 异步断言）。</p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('human-test-cases.html', '按人类测试思路组织：前置条件、步骤、预期、接口、数据、异步。');
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const type = document.getElementById('type');
+    const priority = document.getElementById('priority');
+    const stats = document.getElementById('stats');
+    const cases = document.getElementById('cases');
+
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const t = type.value;
+      const p = priority.value;
+      const rows = (window.HUMAN_TEST_CASES || [])
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => t === 'all' || x.type === t)
+        .filter(x => p === 'all' || x.priority === p)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+
+      const p0 = rows.filter(x => x.priority === 'P0').length;
+      const p1 = rows.filter(x => x.priority === 'P1').length;
+      const p2 = rows.filter(x => x.priority === 'P2').length;
+      stats.innerHTML = `
+        <span class="kpi">结果：${rows.length}</span>
+        <span class="kpi p0">P0: ${p0}</span>
+        <span class="kpi p1">P1: ${p1}</span>
+        <span class="kpi p2">P2: ${p2}</span>
+      `;
+
+      cases.innerHTML = rows.map(x => `<article class="case">
+        <h4>${x.id} · ${x.title}</h4>
+        <div class="meta">
+          <span class="badge">${x.d}</span>
+          <span class="badge ${x.priority.toLowerCase()}">${x.priority}</span>
+          <span class="badge t-${x.type}">${x.type}</span>
+        </div>
+        <div class="sec"><b>前置条件</b>${x.pre}</div>
+        <div class="sec"><b>测试步骤</b><ol>${x.steps.map(s => `<li>${s}</li>`).join('')}</ol></div>
+        <div class="sec"><b>预期 UI</b>${x.expectUI}</div>
+        <div class="sec"><b>预期 API</b><code>${x.expectAPI}</code></div>
+        <div class="sec"><b>预期数据</b>${x.expectData}</div>
+        <div class="sec"><b>预期异步</b>${x.expectJobs}</div>
+        <div class="sec"><b>证据截图</b>${x.evidence ? `<code>${x.evidence}</code>` : '待补充'}</div>
+      </article>`).join('');
+    }
+
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    type.addEventListener('change', render);
+    priority.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>
