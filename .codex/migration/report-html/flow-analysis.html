@@ -69,6 +69,10 @@
     const stats = document.getElementById('stats');
     const interaction = document.getElementById('interaction');
     const business = document.getElementById('business');
+    function evidenceThumb(path, title) {
+      if (!path) return '待补';
+      return `<a class="thumb-link" href="${path}" target="_blank"><img class="thumb-img" src="${path}" alt="${title}" /><span class="thumb-open">打开原图</span></a>`;
+    }
 
     function render() {
       const s = q.value.trim().toLowerCase();
@@ -94,7 +98,7 @@
         <div class="line"><b>接口链：</b><code>${x.apiChain}</code></div>
         <div class="line"><b>状态变化：</b>${x.stateChange}</div>
         <div class="line"><b>异步：</b>${x.async}</div>
-        <div class="line"><b>证据：</b>${x.evidence ? `<code>${x.evidence}</code>` : '待补'}</div>
+        <div class="line"><b>证据：</b>${evidenceThumb(x.evidence, x.name)}</div>
       </article>`).join('');
 
       business.innerHTML = bRows.map(x => `<tr>
@@ -109,7 +113,7 @@
         <td><code>${x.api}</code></td>
         <td>${x.state}</td>
         <td>${x.jobs}</td>
-        <td>${x.evidence ? `<code>${x.evidence}</code>` : '待补'}</td>
+        <td>${evidenceThumb(x.evidence, x.operation)}</td>
       </tr>`).join('');
     }
 

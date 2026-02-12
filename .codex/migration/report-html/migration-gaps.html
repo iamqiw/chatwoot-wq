@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>迁移缺口</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索缺口项/影响/替代验证/退出条件..." />
+        <select id="domain">
+          <option value="all">全部域</option>
+          <option value="GLOBAL">GLOBAL</option>
+          <option value="INBOX">INBOX</option>
+          <option value="CMP">CMP</option>
+          <option value="HC">HC</option>
+          <option value="CAPTAIN">CAPTAIN</option>
+          <option value="ASYNC">ASYNC</option>
+          <option value="ACL">ACL</option>
+          <option value="AUTH">AUTH</option>
+        </select>
+      </div>
+      <div id="stats" class="muted"></div>
+    </section>
+
+    <section class="panel">
+      <h3>当前无法自动化完成的项（单开一节）</h3>
+      <div id="gaps" class="gap-grid"></div>
+    </section>
+    <p class="footer">该页用于迁移排期管理：把“做不到”拆成可追踪任务，不让风险在上线前爆发。</p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('migration-gaps.html', '聚焦无法完全自动化验证的高风险缺口，明确替代验证与退出标准。');
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const stats = document.getElementById('stats');
+    const gaps = document.getElementById('gaps');
+    function kls(risk) {
+      if (risk === '高') return 'risk-high';
+      if (risk === '中') return 'risk-mid';
+      return 'risk-low';
+    }
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const rows = (window.MIGRATION_GAPS || [])
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+      stats.innerHTML = `
+        <span class="kpi">缺口总数：${rows.length}</span>
+        <span class="kpi sev-high">高风险：${rows.filter(x => x.risk === '高').length}</span>
+        <span class="kpi sev-mid">中风险：${rows.filter(x => x.risk === '中').length}</span>
+        <span class="kpi sev-low">低风险：${rows.filter(x => x.risk === '低').length}</span>
+      `;
+      gaps.innerHTML = rows.map(x => `<article class="gap">
+        <h4>${x.id} · ${x.topic}</h4>
+        <div class="line"><span class="badge">${x.d}</span><span class="badge">${x.type}</span><span class="badge ${kls(x.risk)}">${x.risk}风险</span></div>
+        <div class="line"><b>当前状态：</b>${x.status}</div>
+        <div class="line"><b>做不到原因：</b>${x.blockedBy}</div>
+        <div class="line"><b>影响：</b>${x.impact}</div>
+        <div class="line"><b>替代验证：</b><ol>${x.workaround.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="line"><b>责任人：</b>${x.owner}</div>
+        <div class="line"><b>退出条件：</b>${x.exitCriteria}</div>
+        <div class="line"><b>代码锚点：</b><ol>${x.code.map(v => `<li><code>${v}</code></li>`).join('')}</ol></div>
+      </article>`).join('');
+    }
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

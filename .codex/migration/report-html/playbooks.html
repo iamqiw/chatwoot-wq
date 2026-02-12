@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>流程剧本</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索剧本ID/业务目标/步骤/API/代码文件..." />
+        <select id="domain">
+          <option value="all">全部业务域</option>
+          <option value="CONV">CONV</option>
+          <option value="INBOX">INBOX</option>
+          <option value="CRM">CRM</option>
+          <option value="AUTO">AUTO</option>
+          <option value="CMP">CMP</option>
+          <option value="HC">HC</option>
+          <option value="CAPTAIN">CAPTAIN</option>
+          <option value="ACL">ACL</option>
+          <option value="ASYNC">ASYNC</option>
+          <option value="AUTH">AUTH</option>
+        </select>
+      </div>
+      <div id="stats" class="muted"></div>
+    </section>
+
+    <section class="panel">
+      <h3>交互+业务流程剧本（脚本级）</h3>
+      <div id="playbooks" class="playbook-grid"></div>
+    </section>
+    <p class="footer">每条剧本都包含：操作步骤、接口链路、状态变化、异步任务、代码锚点、验收断言与回归范围。</p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('playbooks.html', '按人类测试执行方式整理流程剧本，直接作为迁移首版验收脚本。');
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const stats = document.getElementById('stats');
+    const list = document.getElementById('playbooks');
+    function badgeClass(level) {
+      if (level === '高') return 'risk-high';
+      if (level === '中') return 'risk-mid';
+      return 'risk-low';
+    }
+    function evidenceThumb(path, title) {
+      if (!path) return '待补';
+      return `<a class="thumb-link" href="${path}" target="_blank"><img class="thumb-img" src="${path}" alt="${title}" /><span class="thumb-open">打开原图</span></a>`;
+    }
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const rows = (window.FLOW_PLAYBOOKS || [])
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+      const high = rows.filter(x => x.risk === '高').length;
+      const mid = rows.filter(x => x.risk === '中').length;
+      const low = rows.filter(x => x.risk === '低').length;
+      stats.innerHTML = `
+        <span class="kpi">剧本数：${rows.length}</span>
+        <span class="kpi sev-high">高风险：${high}</span>
+        <span class="kpi sev-mid">中风险：${mid}</span>
+        <span class="kpi sev-low">低风险：${low}</span>
+      `;
+      list.innerHTML = rows.map(x => `<article class="playbook">
+        <h4>${x.id} · ${x.title}</h4>
+        <div class="meta"><span class="badge">${x.d}</span><span class="badge">${x.actor}</span><span class="badge ${badgeClass(x.risk)}">${x.risk}风险</span></div>
+        <div class="sec"><b>业务目标</b>${x.objective}</div>
+        <div class="sec"><b>入口/出口</b><code>${x.entry}</code> -> <code>${x.exit}</code></div>
+        <div class="sec"><b>前置条件</b><ol>${x.pre.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="sec"><b>交互步骤（页面点击链）</b><ol>${x.interaction.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="sec"><b>业务操作步骤（端到端）</b><ol>${x.business.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="sec"><b>接口链路</b><ol>${x.api.map(v => `<li><code>${v}</code></li>`).join('')}</ol></div>
+        <div class="sec"><b>状态模型</b>${x.state}</div>
+        <div class="sec"><b>异步任务</b><ol>${x.jobs.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="sec"><b>验收断言</b><ol>${x.assertions.map(v => `<li>${v}</li>`).join('')}</ol></div>
+        <div class="sec"><b>回归范围</b>${x.regression}</div>
+        <div class="sec"><b>代码锚点</b><ol>${x.code.map(v => `<li><code>${v}</code></li>`).join('')}</ol></div>
+        <div class="sec"><b>证据截图</b>${evidenceThumb(x.evidence, x.title)}</div>
+      </article>`).join('');
+    }
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>
