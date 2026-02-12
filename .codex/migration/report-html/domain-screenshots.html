@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>业务域截图看板</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索截图名/路径..." />
+        <select id="domain">
+          <option value="all">全部业务域</option>
+          <option value="CONV">CONV 会话</option>
+          <option value="INBOX">INBOX 渠道</option>
+          <option value="CRM">CRM 联系人</option>
+          <option value="AUTO">AUTO 自动化</option>
+          <option value="CMP">CMP 营销</option>
+          <option value="HC">HC 帮助中心</option>
+          <option value="CAPTAIN">CAPTAIN AI</option>
+          <option value="ACL">ACL 权限设置</option>
+          <option value="ASYNC">ASYNC 调度</option>
+          <option value="AUTH">AUTH 认证</option>
+          <option value="OTHER">OTHER 其他</option>
+        </select>
+      </div>
+      <div id="summary" class="muted"></div>
+      <div id="board"></div>
+    </section>
+    <p class="footer">按业务域归并截图，点击缩略图可放大并打开原图。</p>
+  </div>
+
+  <div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+      <button class="lb-btn lb-prev" id="lbPrev">‹</button>
+      <img id="lbImg" src="" alt="preview" />
+      <button class="lb-btn lb-next" id="lbNext">›</button>
+      <div class="lightbox-bar">
+        <span id="lbTitle"></span>
+        <span><a id="lbOpen" class="open-link" href="#" target="_blank">打开原图</a> · <a id="lbClose" class="open-link" href="#">关闭</a></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('domain-screenshots.html', '截图按业务域重组，便于迁移分工和验收。');
+    setupLightbox();
+
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const board = document.getElementById('board');
+    const summary = document.getElementById('summary');
+
+    const domainOrder = ['CONV', 'INBOX', 'CRM', 'AUTO', 'CMP', 'HC', 'CAPTAIN', 'ACL', 'ASYNC', 'AUTH', 'OTHER'];
+    const labels = {
+      CONV: 'CONV 会话',
+      INBOX: 'INBOX 渠道',
+      CRM: 'CRM 联系人',
+      AUTO: 'AUTO 自动化',
+      CMP: 'CMP 营销',
+      HC: 'HC 帮助中心',
+      CAPTAIN: 'CAPTAIN AI',
+      ACL: 'ACL 权限设置',
+      ASYNC: 'ASYNC 调度',
+      AUTH: 'AUTH 认证',
+      OTHER: 'OTHER 其他'
+    };
+
+    function resolveDomain(item) {
+      const s = `${item.title} ${item.path}`.toLowerCase();
+      if (/sidekiq|scheduled|queues|cron|retries|dead|busy/.test(s)) return 'ASYNC';
+      if (/captain|assistant|faq|scenario|playground|custom tool|document/.test(s)) return 'CAPTAIN';
+      if (/campaign/.test(s)) return 'CMP';
+      if (/helpcenter|help center|portal|article|category/.test(s)) return 'HC';
+      if (/conversation|inbox view|unattended|mentions|notifications|reports/.test(s)) return 'CONV';
+      if (/inbox|whatsapp|email|instagram|tiktok|twilio/.test(s)) return 'INBOX';
+      if (/contact|companies|company/.test(s)) return 'CRM';
+      if (/automation|macro|canned/.test(s)) return 'AUTO';
+      if (/settings|audit|billing|integrations|labels|sla/.test(s)) return 'ACL';
+      if (/login|signup|register/.test(s)) return 'AUTH';
+      if (/super admin|users|accounts|security|profile|roles/.test(s)) return 'ACL';
+      return 'OTHER';
+    }
+
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const rows = (window.SCREENSHOT_DATA || [])
+        .map(x => ({ ...x, domain: resolveDomain(x) }))
+        .filter(x => d === 'all' || x.domain === d)
+        .filter(x => x.title.toLowerCase().includes(s) || x.path.toLowerCase().includes(s));
+
+      summary.textContent = `当前结果：${rows.length} / ${(window.SCREENSHOT_DATA || []).length}`;
+      const grouped = {};
+      domainOrder.forEach(k => { grouped[k] = []; });
+      rows.forEach(r => grouped[r.domain].push(r));
+      const statHtml = domainOrder
+        .filter(k => grouped[k].length > 0)
+        .map(k => `<span class="kpi">${labels[k]}: ${grouped[k].length}</span>`)
+        .join('');
+      summary.innerHTML = `当前结果：${rows.length} / ${(window.SCREENSHOT_DATA || []).length}<br/>${statHtml}`;
+
+      let cursor = 0;
+      board.innerHTML = domainOrder
+        .filter(k => grouped[k].length > 0)
+        .map(k => {
+          const cards = grouped[k].map(x => {
+            const idx = cursor++;
+            return `<article class="shot" data-idx="${idx}">
+              <img src="${x.path}" alt="${x.title}" loading="lazy" />
+              <div class="meta"><b>${x.title}</b><span>${x.scope} · ${x.group}</span></div>
+            </article>`;
+          }).join('');
+          return `<section class="panel">
+            <h3>${labels[k]}（${grouped[k].length}）</h3>
+            <div class="gallery">${cards}</div>
+          </section>`;
+        }).join('');
+
+      window.lightboxBind(rows);
+    }
+
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

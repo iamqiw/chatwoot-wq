@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>业务域深度分析</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div id="hero"></div>
+    <section class="panel">
+      <div class="controls">
+        <input id="q" placeholder="搜索业务域/流程/风险/代码锚点..." />
+        <select id="domain">
+          <option value="all">全部业务域</option>
+          <option value="CONV">CONV</option>
+          <option value="INBOX">INBOX</option>
+          <option value="CRM">CRM</option>
+          <option value="AUTO">AUTO</option>
+          <option value="CMP">CMP</option>
+          <option value="HC">HC</option>
+          <option value="CAPTAIN">CAPTAIN</option>
+          <option value="ACL">ACL</option>
+          <option value="ASYNC">ASYNC</option>
+        </select>
+      </div>
+      <div id="kpis" class="muted"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>域</th>
+              <th>核心业务流程</th>
+              <th>状态模型</th>
+              <th>权限与隔离</th>
+              <th>关键同步接口</th>
+              <th>关键异步任务</th>
+              <th>迁移高风险点</th>
+              <th>核心代码锚点</th>
+            </tr>
+          </thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>可执行行为断言（Given / When / Then）</h3>
+      <p class="muted">用于 Java + React 迁移验收的行为等价检查清单。</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>域</th>
+              <th>ID</th>
+              <th>场景</th>
+              <th>Given</th>
+              <th>When</th>
+              <th>Then</th>
+              <th>接口</th>
+              <th>代码锚点（FE/BE）</th>
+              <th>风险</th>
+            </tr>
+          </thead>
+          <tbody id="ab"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>阅读建议</h3>
+      <ol class="tight">
+        <li>先按域看“迁移高风险点”，确定开发排期与并行顺序。</li>
+        <li>每个域至少先打通 3 条高风险断言（红线能力）。</li>
+        <li>断言通过后，再补中低风险项与边界场景。</li>
+      </ol>
+    </section>
+    <p class="footer">页面：<code>/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/report-html/domain-analysis.html</code></p>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('hero').innerHTML = hero('domain-analysis.html', '按业务域组织的深度分析：流程、状态、权限、接口、异步、风险。');
+    const q = document.getElementById('q');
+    const domain = document.getElementById('domain');
+    const kpis = document.getElementById('kpis');
+    const tb = document.getElementById('tb');
+    const ab = document.getElementById('ab');
+    function sevClass(v) {
+      if (v === 'high') return 'sev-high';
+      if (v === 'mid') return 'sev-mid';
+      return 'sev-low';
+    }
+    function render() {
+      const s = q.value.trim().toLowerCase();
+      const d = domain.value;
+      const rows = (window.DOMAIN_DEEP_ANALYSIS || [])
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+      tb.innerHTML = rows.map(x => `<tr>
+        <td><b>${x.d}</b><br/>${x.name}</td>
+        <td>${x.coreFlow}</td>
+        <td>${x.stateModel}</td>
+        <td>${x.authz}</td>
+        <td><code>${x.syncApi}</code></td>
+        <td>${x.asyncJobs}</td>
+        <td>${x.migrationRisk}</td>
+        <td><code>${x.keyFiles}</code></td>
+      </tr>`).join('');
+
+      const assertions = (window.DOMAIN_ASSERTIONS || [])
+        .filter(x => d === 'all' || x.d === d)
+        .filter(x => JSON.stringify(x).toLowerCase().includes(s));
+      const high = assertions.filter(x => x.sev === 'high').length;
+      const mid = assertions.filter(x => x.sev === 'mid').length;
+      const low = assertions.filter(x => x.sev === 'low').length;
+      kpis.innerHTML = `
+        <span class="kpi">域数量：${rows.length}</span>
+        <span class="kpi">断言总数：${assertions.length}</span>
+        <span class="kpi sev-high">高风险：${high}</span>
+        <span class="kpi sev-mid">中风险：${mid}</span>
+        <span class="kpi sev-low">低风险：${low}</span>
+      `;
+      ab.innerHTML = assertions.map(x => `<tr>
+        <td>${x.d}</td>
+        <td>${x.id}</td>
+        <td>${x.scenario}</td>
+        <td>${x.given}</td>
+        <td>${x.when}</td>
+        <td>${x.then}</td>
+        <td><code>${x.api}</code></td>
+        <td><code>${x.fe}</code><br/><code>${x.be}</code></td>
+        <td><span class="kpi ${sevClass(x.sev)}">${x.sev}</span></td>
+      </tr>`).join('');
+    }
+    q.addEventListener('input', render);
+    domain.addEventListener('change', render);
+    render();
+  </script>
+</body>
+</html>

@@ -1,6 +1,8 @@
 function nav(active) {
   const items = [
     ['index.html', '总览'],
+    ['domain-analysis.html', '业务域深度'],
+    ['domain-screenshots.html', '域截图看板'],
     ['feature-matrix.html', '功能矩阵'],
     ['captain-ai.html', 'Captain AI'],
     ['screenshots.html', '截图中心'],

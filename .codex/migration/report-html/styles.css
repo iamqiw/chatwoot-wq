@@ -50,6 +50,10 @@ code { font-size: 12px; }
 .shot .meta b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shot .meta span { color: var(--muted); }
 .warn { background: var(--warn); border: 1px solid #fed7aa; border-radius: 12px; padding: 10px; }
+.kpi { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; margin-right: 6px; background: #fff; }
+.sev-high { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.sev-mid { color: #92400e; border-color: #fed7aa; background: #fffbeb; }
+.sev-low { color: #065f46; border-color: #a7f3d0; background: #ecfdf5; }
 .lightbox { position: fixed; inset: 0; background: rgba(15,23,42,.82); display: none; align-items: center; justify-content: center; z-index: 999; }
 .lightbox.active { display: flex; }
 .lightbox-content { max-width: 95vw; max-height: 95vh; position: relative; }

@@ -226,3 +226,148 @@ window.SCREENSHOT_DATA.push(
   { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/settings-00-index.png", title: "captain settings index", scope: "authenticated", group: "interactive" },
   { path: "/Users/wangqi/git/wangqi/chatwoot-wq/.codex/migration/screenshots/interactive/captain/settings-01-form-visible.png", title: "captain settings form visible", scope: "authenticated", group: "interactive" }
 );
+
+window.DOMAIN_DEEP_ANALYSIS = [
+  {
+    d: 'CONV',
+    name: '会话中心（Conversation）',
+    coreFlow: '接收消息 -> 分派/路由 -> 状态流转(open/pending/resolved/snoozed) -> SLA/报表统计',
+    stateModel: '会话状态与优先级双状态机；toggle_status 有语义约束；last_seen 按小时节流',
+    authz: 'admin 全量可见，agent 受 inbox/team 可见域限制',
+    syncApi: '/api/v1/accounts/:id/conversations, /messages, /assignments',
+    asyncJobs: '自动分配、SLA 计算、通知派发、统计聚合',
+    migrationRisk: '状态机不一致会直接导致统计偏差和坐席工作流错乱',
+    keyFiles: 'app/models/conversation.rb, app/policies/conversation_policy.rb, app/controllers/api/v1/accounts/conversations_controller.rb'
+  },
+  {
+    d: 'INBOX',
+    name: '渠道与收件箱（Inbox/Channel）',
+    coreFlow: '渠道接入(web/email/whatsapp/...) -> inbox 配置 -> 对话归集 -> 成员协作',
+    stateModel: 'inbox 类型驱动行为；active_bot 与 webhook 配置影响自动应答',
+    authz: 'inbox 成员 + 管理员形成可分配集合',
+    syncApi: '/api/v1/accounts/:id/inboxes, /inbox_members, channel-specific endpoints',
+    asyncJobs: 'IMAP 拉取、渠道同步、Webhook 异步处理',
+    migrationRisk: '渠道适配协议差异大，迁移中最易出现“可收不可发”或重复入站',
+    keyFiles: 'app/models/inbox.rb, app/controllers/api/v1/accounts/inboxes_controller.rb'
+  },
+  {
+    d: 'CRM',
+    name: '联系人与客户资料（Contacts/CRM）',
+    coreFlow: '联系人创建/合并/更新 -> 绑定会话 -> 标签/属性驱动分群',
+    stateModel: 'visitor/lead/customer 类型 + email/phone/identifier 唯一性约束',
+    authz: '导入导出、删除等高危操作管理员专属',
+    syncApi: '/api/v1/accounts/:id/contacts, /contact_inboxes, /contact_filters',
+    asyncJobs: '导入批处理、去重归并、事件派发',
+    migrationRisk: '主键/唯一键策略改动会造成脏合并，影响历史会话归属',
+    keyFiles: 'app/models/contact.rb, app/policies/contact_policy.rb'
+  },
+  {
+    d: 'AUTO',
+    name: '自动化与规则（Automation/Macro）',
+    coreFlow: '条件命中 -> 执行动作 -> 会话/联系人侧效果落地',
+    stateModel: '条件白名单 + 动作白名单 + query_operator(AND/OR) 校验',
+    authz: 'Macro 存在 personal/global 可见域与作者权限模型',
+    syncApi: '/api/v1/accounts/:id/automation_rules, /macros',
+    asyncJobs: '计划任务触发、规则扫描、批量执行',
+    migrationRisk: '规则语义不一致会造成“静默失效”且难被业务及时发现',
+    keyFiles: 'app/models/automation_rule.rb, app/models/macro.rb, app/policies/macro_policy.rb'
+  },
+  {
+    d: 'CMP',
+    name: '营销活动（Campaign）',
+    coreFlow: '活动配置 -> 触发匹配 -> 建会话/触发事件 -> 效果统计',
+    stateModel: 'Website=ongoing; SMS/Whatsapp/Twilio=one_off',
+    authz: '营销配置受账号与渠道能力限制',
+    syncApi: '/api/v1/accounts/:id/campaigns, /api/v1/widget/campaigns',
+    asyncJobs: '活动触发监听、消息发送、统计回填',
+    migrationRisk: '触发窗口与防重策略迁移不一致会导致重复触达',
+    keyFiles: 'app/models/campaign.rb, app/listeners/campaign_listener.rb'
+  },
+  {
+    d: 'HC',
+    name: '帮助中心（HelpCenter）',
+    coreFlow: 'Portal -> Category -> Article 发布与多语言管理',
+    stateModel: 'Article: draft/published/archived + locale 继承',
+    authz: 'Portal 管理者与账号管理员权限分层',
+    syncApi: '/api/v1/accounts/:id/portals, /categories, /articles',
+    asyncJobs: '搜索索引更新、内容发布后缓存刷新',
+    migrationRisk: 'slug/custom_domain 唯一性与路由映射迁移风险较高',
+    keyFiles: 'app/models/portal.rb, app/models/article.rb'
+  },
+  {
+    d: 'CAPTAIN',
+    name: 'Captain AI（Assistants/FAQs/Documents/Tools）',
+    coreFlow: '知识构建 -> Assistant 配置 -> Inbox 部署 -> 对话触发 AI 响应',
+    stateModel: 'assistant_responses pending/approved 审核流 + scenario/tool 引用约束',
+    authz: '管理员主导配置，agent 可使用 playground/certain runtime features',
+    syncApi: '/api/v1/accounts/:id/captain/*',
+    asyncJobs: '文档解析、向量更新、AI 任务与响应构建',
+    migrationRisk: '模型调用、配额扣减、工具调用安全策略（SSRF）需行为等价',
+    keyFiles: 'enterprise/app/controllers/api/v1/accounts/captain/*, app/javascript/dashboard/api/captain/*'
+  },
+  {
+    d: 'ACL',
+    name: '权限与多租户（RBAC/Policy）',
+    coreFlow: '用户角色 -> Policy 判定 -> API/页面访问边界',
+    stateModel: 'ApplicationPolicy 默认拒绝，按资源策略逐项放行',
+    authz: 'account 维度隔离 + role 维度能力裁剪',
+    syncApi: '全域 API 都受 policy gate 影响',
+    asyncJobs: '审计日志、敏感操作记录',
+    migrationRisk: '权限判断偏差会导致越权或误拒，属于高风险迁移项',
+    keyFiles: 'app/policies/application_policy.rb, app/policies/*'
+  },
+  {
+    d: 'ASYNC',
+    name: '异步与调度（Sidekiq/Cron）',
+    coreFlow: '定时触发 -> Job 入队 -> 重试/死信 -> 业务补偿',
+    stateModel: 'schedule.yml 里有 1min/5min/15min/30min 多节奏任务',
+    authz: '系统级任务，不直接暴露给业务角色',
+    syncApi: 'Sidekiq Web + 任务触发链路',
+    asyncJobs: 'trigger_scheduled_items, trigger_imap_email_inboxes, auto_assignment, cleanup',
+    migrationRisk: 'Java 迁移时需保证幂等、重试策略、任务粒度与时钟一致',
+    keyFiles: 'config/schedule.yml, app/jobs/**/*'
+  }
+];
+
+window.FEATURE_DATA.push(
+  { d:'CAPTAIN', id:'CAP-D01', f:'FAQ 审核状态机', r:'/api/v1/accounts/:id/captain/assistant_responses', rule:'pending/approved 双列表切换必须一致', fe:'app/javascript/dashboard/api/captain/response.js', be:'enterprise/app/controllers/api/v1/accounts/captain/assistant_responses_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-D02', f:'文档导入与索引', r:'/api/v1/accounts/:id/captain/documents', rule:'文档创建后可被 FAQ 关联检索', fe:'app/javascript/dashboard/api/captain/document.js', be:'enterprise/app/controllers/api/v1/accounts/captain/documents_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-D03', f:'Scenario 新建与建议场景', r:'/api/v1/accounts/:id/captain/assistants/:assistant_id/scenarios', rule:'Add all 与手工创建均落入同一场景集合', fe:'app/javascript/dashboard/api/captain/scenarios.js', be:'enterprise/app/controllers/api/v1/accounts/captain/scenarios_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-D04', f:'Custom Tool 创建', r:'/api/v1/accounts/:id/captain/custom_tools', rule:'method/auth/parameters 字段组合需可持久化', fe:'app/javascript/dashboard/api/captain/customTools.js', be:'enterprise/app/controllers/api/v1/accounts/captain/custom_tools_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-D05', f:'Inbox 绑定助手', r:'/api/v1/accounts/:id/captain/assistants/:assistant_id/inboxes', rule:'同一 inbox 仅能绑定单 assistant', fe:'app/javascript/dashboard/api/captain/inboxes.js', be:'enterprise/app/controllers/api/v1/accounts/captain/inboxes_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-D06', f:'设置与偏好', r:'/api/v1/accounts/:id/captain/preferences', rule:'模型与开关配置需即时生效', fe:'app/javascript/dashboard/api/captain/preferences.js', be:'config/routes.rb:59' },
+  { d:'ASYNC', id:'ASYNC-D05', f:'Captain 文档异步处理', r:'captain documents jobs', rule:'导入 -> 解析 -> 响应构建链路需幂等', fe:'N/A', be:'enterprise/app/controllers/api/v1/accounts/captain/documents_controller.rb' },
+  { d:'ACL', id:'ACL-D04', f:'Captain 管理权限', r:'captain controller actions', rule:'配置类动作应限制 admin；运行态动作支持 agent 范围', fe:'app/javascript/dashboard/routes/dashboard/captain/captain.routes.js', be:'enterprise/app/controllers/api/v1/accounts/captain/assistants_controller.rb' }
+);
+
+window.DOMAIN_ASSERTIONS = [
+  { d:'CONV', id:'CONV-A01', sev:'high', scenario:'会话状态切换', given:'会话处于 pending', when:'执行 toggle_status', then:'状态变为 open 且列表归位', api:'POST /api/v1/accounts/:id/conversations/:id/toggle_status', fe:'conversation store', be:'app/models/conversation.rb' },
+  { d:'CONV', id:'CONV-A02', sev:'mid', scenario:'优先级更新', given:'会话存在', when:'优先级改为 urgent', then:'列表与详情优先级一致', api:'PATCH /api/v1/accounts/:id/conversations/:id', fe:'conversation header UI', be:'app/models/conversation.rb' },
+  { d:'CONV', id:'CONV-A03', sev:'high', scenario:'可见域限制', given:'agent 不在 inbox/team', when:'访问会话详情', then:'返回拒绝或不可见', api:'GET /api/v1/accounts/:id/conversations/:id', fe:'conversation route guard', be:'app/policies/conversation_policy.rb' },
+  { d:'INBOX', id:'INBOX-A01', sev:'high', scenario:'渠道创建', given:'账号管理员', when:'创建新 inbox', then:'成员、渠道配置和 webhook 均持久化', api:'POST /api/v1/accounts/:id/inboxes', fe:'settings inbox forms', be:'app/controllers/api/v1/accounts/inboxes_controller.rb' },
+  { d:'INBOX', id:'INBOX-A02', sev:'mid', scenario:'成员分配', given:'存在 inbox 与坐席', when:'添加成员', then:'会话分配列表立即可选', api:'POST /api/v1/accounts/:id/inbox_members', fe:'inbox members UI', be:'app/models/inbox.rb' },
+  { d:'INBOX', id:'INBOX-A03', sev:'high', scenario:'IMAP 拉取链路', given:'邮箱渠道已配置', when:'调度任务触发', then:'邮件转入会话且不重复', api:'background jobs', fe:'N/A', be:'config/schedule.yml' },
+  { d:'CRM', id:'CRM-A01', sev:'high', scenario:'联系人唯一性', given:'已有 email 联系人', when:'再创建同 email', then:'触发冲突策略而非重复记录', api:'POST /api/v1/accounts/:id/contacts', fe:'contacts create form', be:'app/models/contact.rb' },
+  { d:'CRM', id:'CRM-A02', sev:'mid', scenario:'联系人属性更新', given:'联系人存在', when:'更新自定义属性', then:'列表筛选与详情一致', api:'PATCH /api/v1/accounts/:id/contacts/:id', fe:'contact profile panel', be:'app/models/contact.rb' },
+  { d:'CRM', id:'CRM-A03', sev:'high', scenario:'高危操作限权', given:'非管理员用户', when:'执行导出/删除', then:'请求被拒绝', api:'DELETE/EXPORT contacts', fe:'contacts actions', be:'app/policies/contact_policy.rb' },
+  { d:'AUTO', id:'AUTO-A01', sev:'high', scenario:'条件校验', given:'新建自动化规则', when:'query_operator 非 AND/OR', then:'保存失败并提示', api:'POST /api/v1/accounts/:id/automation_rules', fe:'automation builder', be:'app/models/automation_rule.rb' },
+  { d:'AUTO', id:'AUTO-A02', sev:'mid', scenario:'动作白名单', given:'规则动作配置', when:'动作不在白名单', then:'后端拒绝', api:'POST /api/v1/accounts/:id/automation_rules', fe:'automation action picker', be:'app/models/automation_rule.rb' },
+  { d:'AUTO', id:'AUTO-A03', sev:'mid', scenario:'宏权限', given:'personal macro', when:'其他 agent 访问', then:'仅作者或管理员可操作', api:'GET /api/v1/accounts/:id/macros', fe:'macros list', be:'app/policies/macro_policy.rb' },
+  { d:'CMP', id:'CMP-A01', sev:'high', scenario:'活动类型推导', given:'Website 活动', when:'创建保存', then:'campaign_type=ongoing', api:'POST /api/v1/accounts/:id/campaigns', fe:'campaign form', be:'app/models/campaign.rb' },
+  { d:'CMP', id:'CMP-A02', sev:'high', scenario:'URL 校验', given:'Website 活动 URL 非 http/https', when:'提交', then:'保存失败', api:'POST /api/v1/accounts/:id/campaigns', fe:'campaign form validation', be:'app/models/campaign.rb' },
+  { d:'CMP', id:'CMP-A03', sev:'mid', scenario:'触发防重', given:'命中同活动条件', when:'重复访问页面', then:'不会重复创建过量会话', api:'/api/v1/widget/campaigns', fe:'widget trigger', be:'app/listeners/campaign_listener.rb' },
+  { d:'HC', id:'HC-A01', sev:'high', scenario:'Portal 唯一性', given:'已有 slug', when:'创建同 slug portal', then:'保存失败', api:'POST /api/v1/accounts/:id/portals', fe:'help center portal form', be:'app/models/portal.rb' },
+  { d:'HC', id:'HC-A02', sev:'mid', scenario:'文章状态流转', given:'draft 文章', when:'发布后再归档', then:'状态按 draft->published->archived 流转', api:'PATCH /api/v1/accounts/:id/articles/:id', fe:'article editor', be:'app/models/article.rb' },
+  { d:'HC', id:'HC-A03', sev:'mid', scenario:'多语言继承', given:'portal 默认语言', when:'新建文章未指定 locale', then:'使用 portal locale', api:'POST /api/v1/accounts/:id/articles', fe:'article create', be:'app/models/article.rb' },
+  { d:'CAPTAIN', id:'CAP-A01', sev:'high', scenario:'FAQ 状态切换', given:'存在 pending FAQ', when:'切换到 approved 视图', then:'两侧数量与条目一致', api:'GET /api/v1/accounts/:id/captain/assistant_responses?status=*', fe:'captain responses page', be:'enterprise/app/controllers/api/v1/accounts/captain/assistant_responses_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-A02', sev:'high', scenario:'文档导入', given:'填写 URL 或文档', when:'创建 document', then:'文档可见且可触发相关 FAQ 查询', api:'POST /api/v1/accounts/:id/captain/documents', fe:'captain documents page', be:'enterprise/app/controllers/api/v1/accounts/captain/documents_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-A03', sev:'high', scenario:'Scenario Add all', given:'推荐场景存在', when:'点击 Add all', then:'新增多条 scenario 并可搜索', api:'POST /api/v1/accounts/:id/captain/assistants/:assistant_id/scenarios', fe:'captain scenarios page', be:'enterprise/app/controllers/api/v1/accounts/captain/scenarios_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-A04', sev:'high', scenario:'Custom Tool 表单组合', given:'填写 method/auth/parameter', when:'提交创建', then:'后端持久化并可在 scenario 引用', api:'POST /api/v1/accounts/:id/captain/custom_tools', fe:'captain tools page', be:'enterprise/app/controllers/api/v1/accounts/captain/custom_tools_controller.rb' },
+  { d:'CAPTAIN', id:'CAP-A05', sev:'high', scenario:'Inbox 绑定限制', given:'inbox 已绑定 assistant A', when:'再次绑定 assistant B', then:'被唯一约束阻止', api:'POST /api/v1/accounts/:id/captain/assistants/:assistant_id/inboxes', fe:'captain inboxes page', be:'enterprise/app/controllers/api/v1/accounts/captain/inboxes_controller.rb' },
+  { d:'ACL', id:'ACL-A01', sev:'high', scenario:'默认拒绝', given:'未显式放行动作', when:'调用策略动作', then:'create/update/destroy 默认 false', api:'all APIs', fe:'N/A', be:'app/policies/application_policy.rb' },
+  { d:'ACL', id:'ACL-A02', sev:'high', scenario:'资源级策略', given:'agent 角色', when:'访问超权限资源', then:'返回拒绝', api:'policy protected endpoints', fe:'route guards', be:'app/policies/*' },
+  { d:'ACL', id:'ACL-A03', sev:'mid', scenario:'自定义角色', given:'配置自定义角色能力', when:'用户切换角色', then:'菜单/API 能力同步变化', api:'settings roles APIs', fe:'settings custom roles', be:'policy + role models' },
+  { d:'ASYNC', id:'ASYNC-A01', sev:'high', scenario:'计划任务节奏', given:'schedule 已加载', when:'系统运行', then:'1min/5min/15min/30min 任务按节奏触发', api:'N/A', fe:'N/A', be:'config/schedule.yml' },
+  { d:'ASYNC', id:'ASYNC-A02', sev:'high', scenario:'失败重试', given:'任务执行异常', when:'重试机制触发', then:'任务可重入且不产生重复副作用', api:'N/A', fe:'N/A', be:'sidekiq retry workflow' },
+  { d:'ASYNC', id:'ASYNC-A03', sev:'mid', scenario:'Sidekiq 可观测性', given:'后台任务运行', when:'查看 Sidekiq 面板', then:'queues/retries/dead 指标可追踪', api:'/sidekiq', fe:'sidekiq web', be:'sidekiq web mount' }
+];
