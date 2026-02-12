@@ -72,6 +72,11 @@ code { font-size: 12px; }
 .case .sec b { display: block; margin-bottom: 4px; color: #0f172a; }
 .case ol { margin: 0; padding-left: 18px; }
 .case li { margin-bottom: 4px; }
+.flow-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(420px,1fr)); gap: 10px; }
+.flow { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 10px; }
+.flow h4 { margin: 0 0 8px; font-size: 14px; }
+.flow .meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.flow .line { font-size: 12px; margin-bottom: 6px; }
 .badge { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 11px; margin-right: 5px; }
 .p0 { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
 .p1 { background: #fff7ed; color: #9a3412; border-color: #fed7aa; }

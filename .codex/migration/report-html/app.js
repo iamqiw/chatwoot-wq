@@ -2,6 +2,7 @@ function nav(active) {
   const items = [
     ['index.html', '总览'],
     ['domain-analysis.html', '业务域深度'],
+    ['flow-analysis.html', '流程分析'],
     ['human-test-cases.html', '测试用例库'],
     ['domain-screenshots.html', '域截图看板'],
     ['feature-matrix.html', '功能矩阵'],
